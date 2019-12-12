@@ -9,12 +9,12 @@
 
 // Which pin on the Arduino is connected to the NeoPixels?
 // On a Trinket or Gemma we suggest changing this to 1:
-#define LED_PIN 13
-#define INTERRUPT_PIN 2
-#define MODE_COUNT 3
+#define LED_PIN 2
+#define INTERRUPT_PIN 3
+#define MODE_COUNT 4
 
 // How many NeoPixels are attached to the Arduino?
-#define NUM_PIXELS 25
+#define NUM_PIXELS 144
 
 #define BRIGHTNESS_STEPS 5
 #define BRIGHTNESS_MAX 80
@@ -92,13 +92,21 @@ void loop()
         Serial.println("Executing rainbow");
         Serial.println("--------------------------------------------");
         oldLightingMode = lightingMode;
-        rainbow(10);
+        rainbow(50);
+    }
+
+    if (lightingMode == 1)
+    {
+        Serial.println("Executing full rainbow");
+        Serial.println("--------------------------------------------");
+        oldLightingMode = lightingMode;
+        fullRainbow(100);
     }
     //
     // constant colours
     //
 
-    if (lightingMode == 1)
+    if (lightingMode == 2)
     {
         if (lightingMode != oldLightingMode)
         {
@@ -110,7 +118,7 @@ void loop()
         }
     }
 
-    if (lightingMode == 2)
+    if (lightingMode == 3)
     {
         if (lightingMode != oldLightingMode)
         {
@@ -287,6 +295,39 @@ void rainbow(int wait)
             // color wheel (range of 65536) along the length of the strip
             // (NUM_PIXELS steps):
             int pixelHue = firstPixelHue + (i * 65536L / NUM_PIXELS);
+            // pixel.ColorHSV() can take 1 or 3 arguments: a hue (0 to 65535) or
+            // optionally add saturation and value (brightness) (each 0 to 255).
+            // Here we're using just the single-argument hue variant. The result
+            // is passed through pixel.gamma32() to provide 'truer' colors
+            // before assigning to each pixel:
+            pixel.setPixelColor(i, pixel.gamma32(pixel.ColorHSV(pixelHue)));
+        }
+        pixel.show(); // Update strip with new contents
+        delay(wait);  // Pause for a moment
+        if (interrupted)
+        {
+            Serial.println("BREAK rainbow");
+            interrupted = false;
+            break;
+        }
+    }
+}
+
+// Rainbow cycle along whole strip. Pass delay time (in ms) between frames.
+void fullRainbow(int wait)
+{
+    // Hue of first pixel runs 5 complete loops through the color wheel.
+    // Color wheel has a range of 65536 but it's OK if we roll over, so
+    // just count from 0 to 5*65536. Adding 256 to firstPixelHue each time
+    // means we'll make 5*65536/256 = 1280 passes through this outer loop:
+    for (long firstPixelHue = 0; firstPixelHue < 5 * 65536; firstPixelHue += 256)
+    {
+        for (int i = 0; i < NUM_PIXELS; i++)
+        { // For each pixel in strip...
+            // Offset pixel hue by an amount to make one full revolution of the
+            // color wheel (range of 65536) along the length of the strip
+            // (NUM_PIXELS steps):
+            int pixelHue = firstPixelHue;// + (i * 65536L / NUM_PIXELS);
             // pixel.ColorHSV() can take 1 or 3 arguments: a hue (0 to 65535) or
             // optionally add saturation and value (brightness) (each 0 to 255).
             // Here we're using just the single-argument hue variant. The result
