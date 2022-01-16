@@ -9,12 +9,13 @@
 
 // Which pin on the Arduino is connected to the NeoPixels?
 // On a Trinket or Gemma we suggest changing this to 1:
-#define LED_PIN 2
-#define INTERRUPT_PIN 3
-#define MODE_COUNT 4
+#define INTERRUPT_PIN 2
+#define LED_PIN 4
+int ANALOG_PIN = A0;
+#define MODE_COUNT 3
 
 // How many NeoPixels are attached to the Arduino?
-#define NUM_PIXELS 144
+#define NUM_PIXELS 300
 
 #define BRIGHTNESS_STEPS 5
 #define BRIGHTNESS_MAX 80
@@ -26,16 +27,11 @@
 int lightingMode;
 
 // Modes:
-//  True: Light
-//  False: Brightness
 bool modeChangeLighting;
-
 int oldLightingMode;
-
-int brightnessStep;
-
+int brightness;
+int oldBrightness;
 bool interrupted;
-
 bool modeLightingChanged;
 
 // Declare our NeoPixel strip object:
@@ -52,6 +48,8 @@ Adafruit_NeoPixel pixel(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
 // setup() function -- runs once at startup --------------------------------
 void setup()
 {
+    bool mode_read_bug;
+
 // These lines are specifically to support the Adafruit Trinket 5V 16 MHz.
 #if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
     clock_prescale_set(clock_div_1);
@@ -60,151 +58,146 @@ void setup()
     modeChangeLighting = true;
     modeLightingChanged = true;
     interrupted = false;
+    mode_read_bug = false;
 
-    lightingMode = eepromReadInt(0);   // read lightingMode from EEPROM
-    brightnessStep = eepromReadInt(2); // read brightness from EEPROM
+    lightingMode = eepromReadInt(0); // read lightingMode from EEPROM
+    if ((lightingMode < 0) || (lightingMode > MODE_COUNT))
+    {
+        lightingMode = 0;
+        mode_read_bug = true;
+    }
 
     Serial.begin(19200);
     Serial.println("--------------------------------------------");
     Serial.println("--------------------------------------------");
     Serial.println("Welcome to the Turtle Debugging");
     Serial.println("--------------------------------------------");
-    Serial.println("Read lighting mode: " + String(lightingMode));
-    Serial.println("Read brightness step: " + String(brightnessStep));
+    if (mode_read_bug)
+    {
+        Serial.println("Could not read lighting mode. Setting 0.");
+    }
+    else
+    {
+        Serial.println("Read lighting mode: " + String(lightingMode));
+    }
 
-    pinMode(INTERRUPT_PIN, INPUT_PULLUP);                                 // enable pin as input with internal pull up
+    // enable pin as input with internal pull up
+    pinMode(INTERRUPT_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), ISR0, FALLING); // activate ISR
 
-    pixel.begin();                                      // init NeoPixel object (REQUIRED)
-    pixel.show();                                       // Turn OFF all pixels ASAP
-    pixel.setBrightness(getBrightness(brightnessStep)); // Set BRIGHTNESS to about 1/5 (max = 255)
+    brightness = readAnalog();
+
+    // init NeoPixel object (REQUIRED)
+    pixel.begin();
+    constantColor(0x00FF00);
+    pixel.setBrightness(brightness); // Set BRIGHTNESS to about 1/5 (max = 255)
+    pixel.show();                    // Turn OFF all pixels ASAP
 }
 
 void loop()
 {
     if (lightingMode != oldLightingMode)
     {
-        Serial.println("Lichtmodus: " + String(lightingMode));
+        Serial.println("Light mode: " + String(lightingMode));
     }
+
+    brightness = readAnalog();
+    Serial.println("Got brightness of " + String(brightness));
+
+    // Constant
 
     if (lightingMode == 0)
     {
-        Serial.println("Executing rainbow");
-        Serial.println("--------------------------------------------");
-        oldLightingMode = lightingMode;
-        rainbow(50);
-    }
-
-    if (lightingMode == 1)
-    {
-        Serial.println("Executing full rainbow");
-        Serial.println("--------------------------------------------");
-        oldLightingMode = lightingMode;
-        fullRainbow(100);
-    }
-    //
-    // constant colours
-    //
-
-    if (lightingMode == 2)
-    {
-        if (lightingMode != oldLightingMode)
-        {
-            modeLightingChanged = false;
-            Serial.println("Executing turquoise");
-            Serial.println("--------------------------------------------");
-            constantColor(0x00FFFF);
-            oldLightingMode = lightingMode;
-        }
-    }
-
-    if (lightingMode == 3)
-    {
-        if (lightingMode != oldLightingMode)
+        if ((lightingMode != oldLightingMode) || (oldBrightness != brightness))
         {
             modeLightingChanged = false;
             Serial.println("Executing white");
             Serial.println("--------------------------------------------");
             constantColor(0xFFFFFF);
             oldLightingMode = lightingMode;
+            oldBrightness = brightness;
         }
+    }
+
+    if (lightingMode == 1)
+    {
+        if ((lightingMode != oldLightingMode) || (oldBrightness != brightness))
+        {
+            modeLightingChanged = false;
+            Serial.println("Executing turquoise");
+            Serial.println("--------------------------------------------");
+            constantColor(0x00FFFF);
+            oldLightingMode = lightingMode;
+            oldBrightness = brightness;
+        }
+    }
+
+    if (lightingMode == 2)
+    {
+        if ((lightingMode != oldLightingMode) || (oldBrightness != brightness))
+        {
+            modeLightingChanged = false;
+            Serial.println("Executing green");
+            Serial.println("--------------------------------------------");
+            constantColor(0x00FF00);
+            oldLightingMode = lightingMode;
+            oldBrightness = brightness;
+        }
+    }
+
+    // Animated
+
+    if (lightingMode == 3)
+    {
+        Serial.println("Executing rainbow");
+        Serial.println("--------------------------------------------");
+        oldLightingMode = lightingMode;
+            oldBrightness = brightness;
+        rainbow(50);
+    }
+
+    if (lightingMode == 4)
+    {
+        Serial.println("Executing full rainbow");
+        Serial.println("--------------------------------------------");
+        oldLightingMode = lightingMode;
+            oldBrightness = brightness;
+        fullRainbow(100);
     }
 }
 
 void ISR0()
 {
     int counter = 0;
+    static unsigned long last_interrupt_time = 0;
+    unsigned long interrupt_time = millis();
 
-    Serial.println("Interrupt ausgeloest.");
-
-    while (digitalRead(INTERRUPT_PIN) == 0)
+    Serial.println("Triggered interrupt. Waiting for debounce.");
+    // while (digitalRead(INTERRUPT_PIN) == 0)
+    // {
+    //     delay(100);
+    //     counter = counter + 1;
+    // }
+    if (interrupt_time - last_interrupt_time > 200)
     {
-        delay(100);
-        counter = counter + 1;
 
-        if (counter == 2000)
+        Serial.println("Starting ISR0");
+        Serial.println("Pressed button for " + String(counter) + " ms.");
+
+        Serial.println("Change lighting.");
+        if (lightingMode >= MODE_COUNT - 1)
         {
-            constantColor(0x00FF00);
-            pixel.show(); // Update strip with new contents
+            lightingMode = 0;
         }
-    }
-
-    Serial.println("Button fuer " + String(counter) + " ms gedrueckt.");
-
-    if ((counter) > 10)
-    {
-        if ((counter) > 2000) // change modeChangeLighting
+        else
         {
-            Serial.println("Settings modus geaendert.");
-            modeChangeLighting = !modeChangeLighting;
-
-            modeLightingChanged = true;
+            lightingMode = lightingMode + 1;
         }
-        else // counter kleiner als 2000 --> normale Steuerung
-        {
-            interrupted = true;
-            modeLightingChanged = true;
-            if (modeChangeLighting) // change lighting modes
-            {
-                Serial.println("Change lighting.");
-                if (lightingMode >= MODE_COUNT - 1)
-                {
-                    lightingMode = 0;
-                }
-                else
-                {
-                    lightingMode = lightingMode + 1;
-                }
-                Serial.println("Modus zu " + String(lightingMode) + " geaendert.");
-            }
-            else // change brightness
-            {
-                Serial.println("Change brightness. Currently at " + String(brightnessStep) + " / " + String(BRIGHTNESS_STEPS));
-
-                if (brightnessStep >= BRIGHTNESS_STEPS)
-                {
-                    brightnessStep = 1;
-                }
-                else
-                {
-                    brightnessStep = brightnessStep + 1;
-                }
-
-                Serial.println("New brightness: " + String(brightnessStep) + " / " + String(BRIGHTNESS_STEPS));
-                int brightness = getBrightness(brightnessStep);
-                Serial.println("Set brightness to " + String(brightness) + " / " + String(BRIGHTNESS_MAX));
-                pixel.setBrightness(brightness);
-                pixel.show();
-            }
-            eepromWriteInt(0, lightingMode);   // save lightingMode in EEPROM
-            eepromWriteInt(2, brightnessStep); //
-            Serial.println("ISR finished");
-        }
+        Serial.println("Changed mode to " + String(lightingMode));
+        eepromWriteInt(0, lightingMode); // save lightingMode in EEPROM
+        Serial.println("ISR finished");
     }
-    else
-    {
-        Serial.println("ABORT Interrupt.");
-    }
+    last_interrupt_time = interrupt_time;
 }
 
 int getBrightness(int step)
@@ -217,7 +210,7 @@ void eepromWriteInt(int adr, int wert)
     byte low, high;
     low = wert & 0xFF;
     high = (wert >> 8) & 0xFF;
-    EEPROM.write(adr, low); // dauert 3,3ms
+    EEPROM.write(adr, low); // takes 3,3ms
     EEPROM.write(adr + 1, high);
     return;
 } //eepromWriteInt
@@ -230,6 +223,13 @@ int eepromReadInt(int adr)
     return low + ((high << 8) & 0xFF00);
 } //eepromReadInt
 
+int readAnalog()
+{
+    int val = 1023 - analogRead(ANALOG_PIN);
+    Serial.println("Analgo value read: " + String(val));
+    return map(val, 0, 1023, 0, 255);
+}
+
 // Some functions of our own for creating animated effects -----------------
 
 void constantColor(uint32_t color)
@@ -238,6 +238,7 @@ void constantColor(uint32_t color)
     {
         pixel.setPixelColor(i, color);
     }
+    pixel.setBrightness(brightness);
     pixel.show();
     Serial.println("Colour written");
 
@@ -327,7 +328,7 @@ void fullRainbow(int wait)
             // Offset pixel hue by an amount to make one full revolution of the
             // color wheel (range of 65536) along the length of the strip
             // (NUM_PIXELS steps):
-            int pixelHue = firstPixelHue;// + (i * 65536L / NUM_PIXELS);
+            int pixelHue = firstPixelHue; // + (i * 65536L / NUM_PIXELS);
             // pixel.ColorHSV() can take 1 or 3 arguments: a hue (0 to 65535) or
             // optionally add saturation and value (brightness) (each 0 to 255).
             // Here we're using just the single-argument hue variant. The result
