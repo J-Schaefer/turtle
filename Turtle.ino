@@ -12,13 +12,13 @@
 #define INTERRUPT_PIN 2
 #define LED_PIN 4
 int ANALOG_PIN = A0;
-#define MODE_COUNT 3
+#define MODE_COUNT 4
 
 // How many NeoPixels are attached to the Arduino?
-#define NUM_PIXELS 300
+#define NUM_PIXELS 129
 
-#define BRIGHTNESS_STEPS 5
-#define BRIGHTNESS_MAX 80
+#define BRIGHTNESS_MIN 10
+#define BRIGHTNESS_MAX 255
 
 // Modes:
 //  0: Rainbow cycle
@@ -124,6 +124,19 @@ void loop()
         if ((lightingMode != oldLightingMode) || (oldBrightness != brightness))
         {
             modeLightingChanged = false;
+            Serial.println("Executing warm white");
+            Serial.println("--------------------------------------------");
+            constantMixedColor(0xFFFFFF, 0xDE7214, 3);
+            oldLightingMode = lightingMode;
+            oldBrightness = brightness;
+        }
+    }
+
+    if (lightingMode == 2)
+    {
+        if ((lightingMode != oldLightingMode) || (oldBrightness != brightness))
+        {
+            modeLightingChanged = false;
             Serial.println("Executing turquoise");
             Serial.println("--------------------------------------------");
             constantColor(0x00FFFF);
@@ -132,7 +145,7 @@ void loop()
         }
     }
 
-    if (lightingMode == 2)
+    if (lightingMode == 3)
     {
         if ((lightingMode != oldLightingMode) || (oldBrightness != brightness))
         {
@@ -147,21 +160,21 @@ void loop()
 
     // Animated
 
-    if (lightingMode == 3)
+    if (lightingMode == 4)
     {
         Serial.println("Executing rainbow");
         Serial.println("--------------------------------------------");
         oldLightingMode = lightingMode;
-            oldBrightness = brightness;
+        oldBrightness = brightness;
         rainbow(50);
     }
 
-    if (lightingMode == 4)
+    if (lightingMode == 5)
     {
         Serial.println("Executing full rainbow");
         Serial.println("--------------------------------------------");
         oldLightingMode = lightingMode;
-            oldBrightness = brightness;
+        oldBrightness = brightness;
         fullRainbow(100);
     }
 }
@@ -200,11 +213,6 @@ void ISR0()
     last_interrupt_time = interrupt_time;
 }
 
-int getBrightness(int step)
-{
-    return (int)(((double)step / (double)BRIGHTNESS_STEPS) * BRIGHTNESS_MAX);
-}
-
 void eepromWriteInt(int adr, int wert)
 {
     byte low, high;
@@ -213,7 +221,7 @@ void eepromWriteInt(int adr, int wert)
     EEPROM.write(adr, low); // takes 3,3ms
     EEPROM.write(adr + 1, high);
     return;
-} //eepromWriteInt
+} // eepromWriteInt
 
 int eepromReadInt(int adr)
 {
@@ -221,13 +229,13 @@ int eepromReadInt(int adr)
     low = EEPROM.read(adr);
     high = EEPROM.read(adr + 1);
     return low + ((high << 8) & 0xFF00);
-} //eepromReadInt
+} // eepromReadInt
 
 int readAnalog()
 {
     int val = 1023 - analogRead(ANALOG_PIN);
     Serial.println("Analgo value read: " + String(val));
-    return map(val, 0, 1023, 0, 255);
+    return map(val, 0, 1023, BRIGHTNESS_MIN, BRIGHTNESS_MAX);
 }
 
 // Some functions of our own for creating animated effects -----------------
@@ -241,6 +249,26 @@ void constantColor(uint32_t color)
     pixel.setBrightness(brightness);
     pixel.show();
     Serial.println("Colour written");
+
+    return;
+}
+
+void constantMixedColor(uint32_t color1, uint32_t color2, uint32_t num2)
+{
+    for (int i = 0; i < NUM_PIXELS; i++)
+    {
+        if ((i % num2) == 0)
+        {
+            pixel.setPixelColor(i, color2);
+        }
+        else
+        {
+            pixel.setPixelColor(i, color1);
+        }
+    }
+    pixel.setBrightness(brightness);
+    pixel.show();
+    Serial.println("Colours written");
 
     return;
 }
