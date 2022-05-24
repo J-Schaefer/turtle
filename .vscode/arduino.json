@@ -1,8 +1,7 @@
 {
-    "board": "arduino:avr:nano",
-    "configuration": "cpu=atmega328",
+    "board": "arduino:avr:uno",
     "programmer": "AVRISP mkII",
     "sketch": "Turtle.ino",
-    "port": "/dev/ttyUSB0",
+    "port": "/dev/ttyACM0",
     "output": "../ArduinoOutput"
 }
