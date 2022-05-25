@@ -46,6 +46,8 @@
 #define PB_FADE 0x6C93FF00
 #define PB_SMOOTH 0x6897FF00
 
+int random_colors[] = {PB_R0, PB_G0, PB_B0, PB_R2, PB_R4, PB_R2, PB_R4, PB_B3};
+
 IRrecv irrecv(RECV_PIN);
 decode_results results;
 
@@ -63,6 +65,8 @@ int oldBrightness;
 bool interrupted;
 bool modeLightingChanged;
 uint32_t g_color;
+uint32_t oldColor;
+uint32_t g_key;
 
 // Declare our NeoPixel strip object:
 Adafruit_NeoPixel pixel(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
@@ -97,7 +101,7 @@ void setup()
     //     mode_read_bug = true;
     // }
 
-    Serial.begin(19200);
+    Serial.begin(115200);
     Serial.println("--------------------------------------------");
     Serial.println("--------------------------------------------");
     Serial.println("Welcome to the Plumbob Debugging");
@@ -124,16 +128,28 @@ void setup()
     g_color = 0x00FF00;
     constantColor(g_color);
     pixel.setBrightness(g_brightness); // Set BRIGHTNESS to about 1/5 (max = 255)
-    pixel.show();                    // Turn OFF all pixels ASAP
+    pixel.show();                      // Turn OFF all pixels ASAP
 }
 
 void loop()
 {
+    uint32_t key;
 
-    if (irrecv.decode())
+    if (irrecv.decode() || interrupted)
     {
-        Serial.println(irrecv.decodedIRData.decodedRawData, HEX);
-        switch (irrecv.decodedIRData.decodedRawData)
+        if (interrupted)
+        {
+            Serial.print("Using interrupted value");
+            key = g_key;
+            interrupted = false;
+        }
+        else
+        {
+            Serial.print("Using read value");
+            key = irrecv.decodedIRData.decodedRawData;
+        }
+        Serial.println(key, HEX);
+        switch (key)
         {
         case PB_OFF:
             Serial.println("OFF pressed.");
@@ -148,133 +164,124 @@ void loop()
             Serial.println("R0 pressed.");
             lightingMode = 0;
             g_color = 0xFF0000;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_R1:
             Serial.println("R1 pressed.");
             lightingMode = 0;
-            g_color = 0x993300;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
+            g_color = 0xFF9933;
             break;
         case PB_R2:
             Serial.println("R2 pressed.");
             lightingMode = 0;
-            g_color = 0xFFFFFF;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
+            g_color = 0x99FF33;
             break;
         case PB_R3:
             Serial.println("R3 pressed.");
             lightingMode = 0;
             g_color = 0xCCFF33;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_R4:
             Serial.println("R4 pressed.");
             lightingMode = 0;
             g_color = 0x66FF33;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_G0:
             Serial.println("G0 pressed.");
             lightingMode = 0;
             g_color = 0x00FF00;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_G1:
             Serial.println("G1 pressed.");
             lightingMode = 0;
             g_color = 0x66FFCC;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_G2:
             Serial.println("G2 pressed.");
             lightingMode = 0;
             g_color = 0x33CCFF;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_G3:
             Serial.println("G3 pressed.");
             lightingMode = 0;
             g_color = 0x0066FF;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_G4:
             Serial.println("G4 pressed.");
             lightingMode = 0;
             g_color = 0x3366FF;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_B0:
             Serial.println("B0 pressed.");
             lightingMode = 0;
             g_color = 0x0000FF;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_B1:
             Serial.println("B1 pressed.");
             lightingMode = 0;
             g_color = 0x9966FF;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_B2:
             Serial.println("B2 pressed.");
             lightingMode = 0;
             g_color = 0xCC33FF;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_B3:
             Serial.println("B3 pressed.");
             lightingMode = 0;
             g_color = 0xFF00FF;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
             break;
         case PB_B4:
             Serial.println("B4 pressed.");
             lightingMode = 0;
             g_color = 0xCC0099;
-            Serial.print("Color set to: ");
-            Serial.println(g_color, HEX);
+            break;
+        case PB_WHITE:
+            Serial.println("B4 pressed.");
+            lightingMode = 0;
+            g_color = 0xFFFFFF;
+            break;
+        case PB_FLASH:
+            Serial.println("Smooth pressed.");
+            lightingMode = 3;
+            break;
+        case PB_STROBE:
+            Serial.println("Smooth pressed.");
+            lightingMode = 4;
+            break;
+        case PB_FADE:
+            Serial.println("Smooth pressed.");
+            lightingMode = 2;
+            break;
+        case PB_SMOOTH:
+            Serial.println("Smooth pressed.");
+            lightingMode = 1;
             break;
         case PB_BRIGHTNESS_HIGHER:
             Serial.println("BRIGHTNESS_HIGHER pressed.");
             g_brightness = g_brightness + 50;
-            if (g_brightness > 255)
+            if (g_brightness > BRIGHTNESS_MAX)
             {
-                g_brightness = 255;
+                g_brightness = BRIGHTNESS_MAX;
             }
             Serial.println("Setting brightness to " + String(g_brightness));
             break;
         case PB_BRIGHTNESS_LOWER:
             Serial.println("BRIGHTNESS_LOWER pressed.");
             g_brightness = g_brightness - 50;
-            if (g_brightness < 0)
+            if (g_brightness < BRIGHTNESS_MIN)
             {
-                g_brightness = 0;
+                g_brightness = BRIGHTNESS_MIN;
             }
             Serial.println("Setting brightness to " + String(g_brightness));
             break;
         default:
+            Serial.println("Something else");
             break;
         }
 
-        setLighting();
-
         irrecv.resume();
     }
+    setLighting();
     // if (lightingMode != oldLightingMode)
     // {
     //     Serial.println("Light mode: " + String(lightingMode));
@@ -290,26 +297,59 @@ void setLighting()
 {
     if (lightingMode == 0)
     {
-        // if ((lightingMode != oldLightingMode) || (oldBrightness != brightness))
+        if ((lightingMode != oldLightingMode) || (oldColor != g_color))
+        {
+            Serial.println("Executing constant color");
+            Serial.print("Color set to: ");
+            Serial.println(g_color, HEX);
+            modeLightingChanged = false;
+            constantColor(g_color);
+            oldLightingMode = lightingMode;
+            oldColor = g_color;
+        }
+    }
+
+    if (lightingMode == 1)
+    {
+        // if ((lightingMode != oldLightingMode) || (oldBrightness != g_brightness))
         // {
-        Serial.println("Executing constant color");
         modeLightingChanged = false;
-        constantColor(g_color);
+        Serial.println("Set to slow rainbow");
+        rainbow(50);
+        oldLightingMode = lightingMode;
         // }
     }
 
-    // if (lightingMode == 1)
-    // {
-    //     if ((lightingMode != oldLightingMode) || (oldBrightness != brightness))
-    //     {
-    //         modeLightingChanged = false;
-    //         Serial.println("Executing warm white");
-    //         Serial.println("--------------------------------------------");
-    //         constantMixedColor(0xFFFFFF, 0xDE7214, 3);
-    //         oldLightingMode = lightingMode;
-    //         oldBrightness = brightness;
-    //     }
-    // }
+    if (lightingMode == 2)
+    {
+        // if ((lightingMode != oldLightingMode) || (oldBrightness != g_brightness))
+        // {
+        modeLightingChanged = false;
+        Serial.println("Set to rainbow");
+        rainbow(10);
+        oldLightingMode = lightingMode;
+        // }
+    }
+    if (lightingMode == 3)
+    {
+        // if ((lightingMode != oldLightingMode) || (oldBrightness != g_brightness))
+        // {
+        modeLightingChanged = false;
+        Serial.println("Set to flash");
+        circleRandomColor(50);
+        oldLightingMode = lightingMode;
+        // }
+    }
+    if (lightingMode == 4)
+    {
+        // if ((lightingMode != oldLightingMode) || (oldBrightness != g_brightness))
+        // {
+        modeLightingChanged = false;
+        Serial.println("Set to strobe");
+        circleRandomColor(10);
+        oldLightingMode = lightingMode;
+        // }
+    }
 
     // if (lightingMode == 2)
     // {
@@ -421,7 +461,7 @@ int eepromReadInt(int adr)
 
 void constantColor(uint32_t color)
 {
-    Serial.print("Writing color: " );
+    Serial.print("Writing color: ");
     Serial.print(color, HEX);
     Serial.println();
     for (int i = 0; i < NUM_PIXELS; i++)
@@ -452,6 +492,40 @@ void constantMixedColor(uint32_t color1, uint32_t color2, uint32_t num2)
     pixel.show();
     Serial.println("Colours written");
 
+    return;
+}
+
+void circleRandomColor(int wait)
+{
+    for (int j = 0; j < 8; j++)
+    {
+        int color = random_colors[random(8)];
+        for (int i = 0; i < NUM_PIXELS; i++)
+        {
+            pixel.setPixelColor(i, color);
+        }
+        pixel.setBrightness(g_brightness);
+        pixel.show();
+        if (irrecv.decode())
+        {
+            Serial.println("Received something. Checking.");
+            Serial.println(irrecv.decodedIRData.decodedRawData, HEX);
+            if (irrecv.decodedIRData.decodedRawData != 0)
+            {
+                Serial.println("BREAK rainbow");
+                interrupted = true;
+                g_key = irrecv.decodedIRData.decodedRawData;
+                lightingMode = 0;
+            }
+            irrecv.resume();
+        }
+        delay(wait); // Pause for a moment
+        if (interrupted)
+        {
+            // interrupted = false;
+            break;
+        }
+    }
     return;
 }
 
@@ -498,6 +572,7 @@ void rainbow(int wait)
     // Color wheel has a range of 65536 but it's OK if we roll over, so
     // just count from 0 to 5*65536. Adding 256 to firstPixelHue each time
     // means we'll make 5*65536/256 = 1280 passes through this outer loop:
+    Serial.println("Executing rainbow");
     for (long firstPixelHue = 0; firstPixelHue < 5 * 65536; firstPixelHue += 256)
     {
         for (int i = 0; i < NUM_PIXELS; i++)
@@ -514,11 +589,23 @@ void rainbow(int wait)
             pixel.setPixelColor(i, pixel.gamma32(pixel.ColorHSV(pixelHue)));
         }
         pixel.show(); // Update strip with new contents
-        delay(wait);  // Pause for a moment
+        if (irrecv.decode())
+        {
+            Serial.println("Received something. Checking.");
+            Serial.println(irrecv.decodedIRData.decodedRawData, HEX);
+            if (irrecv.decodedIRData.decodedRawData != 0)
+            {
+                Serial.println("BREAK rainbow");
+                interrupted = true;
+                g_key = irrecv.decodedIRData.decodedRawData;
+                lightingMode = 0;
+            }
+            irrecv.resume();
+        }
+        delay(wait); // Pause for a moment
         if (interrupted)
         {
-            Serial.println("BREAK rainbow");
-            interrupted = false;
+            // interrupted = false;
             break;
         }
     }
