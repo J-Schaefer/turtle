@@ -46,7 +46,7 @@
 #define PB_FADE 0x6C93FF00
 #define PB_SMOOTH 0x6897FF00
 
-int random_colors[] = {PB_R0, PB_G0, PB_B0, PB_R2, PB_R4, PB_R2, PB_R4, PB_B3};
+uint32_t random_colors[] = {0xFF0000, 0x00FF00, 0x0000FF, 0x99FF33, 0x66FF33, 0x99FF33, 0xFF00FF};
 
 IRrecv irrecv(RECV_PIN);
 decode_results results;
@@ -336,7 +336,7 @@ void setLighting()
         // {
         modeLightingChanged = false;
         Serial.println("Set to flash");
-        circleRandomColor(50);
+        circleRandomColor(500);
         oldLightingMode = lightingMode;
         // }
     }
@@ -346,7 +346,7 @@ void setLighting()
         // {
         modeLightingChanged = false;
         Serial.println("Set to strobe");
-        circleRandomColor(10);
+        circleRandomColor(100);
         oldLightingMode = lightingMode;
         // }
     }
@@ -497,15 +497,12 @@ void constantMixedColor(uint32_t color1, uint32_t color2, uint32_t num2)
 
 void circleRandomColor(int wait)
 {
-    for (int j = 0; j < 8; j++)
+    for (int j = 0; j < 7; j++)
     {
-        int color = random_colors[random(8)];
-        for (int i = 0; i < NUM_PIXELS; i++)
-        {
-            pixel.setPixelColor(i, color);
-        }
-        pixel.setBrightness(g_brightness);
-        pixel.show();
+        Serial.print(j);
+        Serial.print("  ");
+        uint32_t color = random_colors[j];
+        constantColor(color);
         if (irrecv.decode())
         {
             Serial.println("Received something. Checking.");
